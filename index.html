@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>코인 슬롯머신</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; padding: 24px;
+    font-family: system-ui, -apple-system, "Noto Sans KR", sans-serif;
+    color: #f7f2e8;
+    background: radial-gradient(circle at top, #35415d 0, #171d2c 48%, #0d111b 100%);
+  }
+  .wrap { max-width: 920px; margin: 0 auto; }
+  h1 { text-align: center; margin: 8px 0 6px; letter-spacing: 2px; }
+  .sub { text-align: center; color: #b9c1d2; margin: 0 0 24px; }
+  .stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 18px; }
+  .panel, .stat {
+    background: #222b3e; border: 1px solid #43506a; border-radius: 16px;
+    box-shadow: 0 8px 24px #0004;
+  }
+  .stat { padding: 14px; text-align: center; }
+  .stat small { display:block; color:#aebbd0; margin-bottom:5px; }
+  .stat strong { font-size: 1.55rem; color: #ffd66b; }
+  .machine { padding: 22px; text-align: center; }
+  .machine h2 { margin: 0 0 8px; }
+  .reels {
+    display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 10px;
+    margin: 20px auto; max-width: 680px;
+  }
+  .reel {
+    min-height: 92px; display:grid; place-items:center; font-size: clamp(2rem,6vw,3.3rem);
+    background: linear-gradient(145deg,#fff4d3,#d8b66c); color:#1b2030;
+    border: 4px solid #8b6b2e; border-radius: 14px;
+    box-shadow: inset 0 2px 8px #fff9, 0 5px 0 #684c20;
+  }
+  .reels.ten { grid-template-columns: repeat(5,minmax(0,1fr)); }
+  .reels.ten .reel { min-height: 76px; }
+  .reel.spinning { animation: reelShake .12s linear infinite, reelGlow .55s ease-in-out infinite alternate; }
+  .reel.winner {
+    position: relative; z-index: 1; border-color: #fff29a;
+    animation: winPop .55s ease-in-out infinite alternate;
+    box-shadow: 0 0 12px #ffe66d, 0 0 28px #ffbd45, inset 0 0 14px #fff;
+  }
+  .reel.winner::after { content: "✦"; position:absolute; top:-13px; right:-8px; color:#fff49a; font-size:1.25rem; text-shadow:0 0 9px #ffdf52; animation: sparkle .7s ease-in-out infinite alternate; }
+  .machine { position:relative; overflow:hidden; }
+  .sparkle-layer { position:absolute; inset:60px 0 75px; pointer-events:none; overflow:hidden; z-index:3; }
+  .sparkle { position:absolute; color:#fff19a; font-size:22px; text-shadow:0 0 10px #ffd84d; animation: burst 1.15s ease-out forwards; }
+  .message.win-message { color:#fff1a8; border:1px solid #e6bd55; box-shadow:0 0 18px #f3c84c55; animation: messageGlow 1s ease-in-out infinite alternate; }
+  @keyframes reelShake { 0%{transform:translateY(-3px)} 50%{transform:translateY(3px)} 100%{transform:translateY(-3px)} }
+  @keyframes reelGlow { from{filter:brightness(1)} to{filter:brightness(1.35)} }
+  @keyframes winPop { from{transform:scale(1)} to{transform:scale(1.09)} }
+  @keyframes sparkle { from{opacity:.35;transform:scale(.65) rotate(0)} to{opacity:1;transform:scale(1.25) rotate(35deg)} }
+  @keyframes burst { 0%{opacity:0;transform:translate(0,15px) scale(.3) rotate(0)} 20%{opacity:1} 100%{opacity:0;transform:translate(var(--dx),-85px) scale(1.5) rotate(150deg)} }
+  @keyframes messageGlow { from{box-shadow:0 0 7px #f3c84c33} to{box-shadow:0 0 20px #f3c84c99} }
+  .actions { display:flex; flex-wrap:wrap; justify-content:center; gap:10px; }
+  button {
+    border:0; border-radius:11px; padding:12px 17px; font-weight:750;
+    cursor:pointer; color:#1b2030; background:#ffd66b; transition:.15s;
+  }
+  button:hover:not(:disabled) { transform:translateY(-2px); filter:brightness(1.08); }
+  button:disabled { opacity:.42; cursor:not-allowed; }
+  .spin { font-size:1.1rem; padding:14px 30px; background:#ffad4d; }
+  .secondary { background:#c9d5eb; }
+  .buffs { margin-top:18px; padding:20px; }
+  .buffs h2 { margin:0 0 14px; }
+  .buff-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }
+  .buff {
+    padding:15px; background:#192235; border:1px solid #3d4c68; border-radius:13px;
+  }
+  .buff h3 { margin:0 0 7px; color:#ffdb83; font-size:1.02rem; }
+  .buff p { color:#c1cada; min-height:48px; margin:0 0 12px; font-size:.92rem; line-height:1.5; }
+  .buff .buyrow { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+  input, select {
+    width:100%; padding:10px; border-radius:9px; border:1px solid #65738d;
+    background:#101827; color:#fff; font:inherit;
+  }
+  .investment { width:110px; }
+  .message {
+    min-height:54px; margin:14px auto 0; max-width:680px; padding:13px;
+    border-radius:10px; background:#131c2c; color:#e8edf7; line-height:1.5;
+  }
+  .log { margin-top:18px; padding:18px; }
+  .log h2 { margin:0 0 10px; }
+  #history { max-height:190px; overflow:auto; color:#c2ccdc; font-size:.9rem; line-height:1.65; }
+  .rules { color:#b9c4d7; font-size:.88rem; line-height:1.6; margin:16px 4px; }
+  @media(max-width:600px) {
+    body { padding:14px; }
+    .stats { gap:7px; }
+    .stat { padding:10px 5px; }
+    .stat strong { font-size:1.2rem; }
+    .buff-grid { grid-template-columns:1fr; }
+    .reels { gap:5px; }
+    .reel { min-height:70px; border-width:3px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🎰 코인 슬롯머신</h1>
+  <p class="sub">행운을 시험하고 버프를 전략적으로 사용해 보세요!</p>
+
+  <section class="stats">
+    <div class="stat"><small>보유 코인</small><strong id="coins">100</strong></div>
+    <div class="stat"><small>이번 회전 비용</small><strong id="cost">10</strong></div>
+    <div class="stat"><small>진행한 회전</small><strong id="turn">0</strong></div>
+    <div class="stat"><small>승리 목표</small><strong id="goal">3,000,000</strong></div>
+  </section>
+
+  <section class="panel machine">
+    <h2 id="machineTitle">SLOT MACHINE</h2>
+    <div id="sparkleLayer" class="sparkle-layer" aria-hidden="true"></div>
+    <div id="reels" class="reels">
+      <div class="reel">🍒</div><div class="reel">🍋</div><div class="reel">🔔</div><div class="reel">⭐</div><div class="reel">🍇</div>
+    </div>
+    <div class="actions">
+      <button id="spinBtn" class="spin" onclick="spin()">🎲 슬롯 돌리기</button>
+      <button class="secondary" onclick="resetGame()">처음부터 다시</button>
+    </div>
+    <div id="message" class="message" aria-live="polite">시작 코인 100개가 지급되었습니다. 슬롯을 돌려 보세요!</div>
+  </section>
+
+  <section class="panel buffs">
+    <h2>✨ 버프 상점</h2>
+    <div class="buff-grid">
+      <div class="buff">
+        <h3>🌿 초원의 가호 — 100코인</h3>
+        <p>다음 회전에서 첫 세 칸의 그림이 똑같이 나옵니다. 사용 후 사라집니다.</p>
+        <div class="buyrow"><button onclick="buyMeadow()">구매하기 (100)</button></div>
+      </div>
+      <div class="buff">
+        <h3>🍞 피버빵지 — 100코인</h3>
+        <p>다음 회전의 슬롯이 10칸으로 늘어납니다. 회전이 끝나면 5칸으로 돌아옵니다.</p>
+        <div class="buyrow"><button onclick="buyFever()">구매하기 (100)</button></div>
+      </div>
+      <div class="buff">
+        <h3>🔮 미희의 직관 — 50코인</h3>
+        <p>다음 회전에서 지정한 한 칸의 그림을 선택할 수 있습니다. 사용 후 사라집니다.</p>
+        <div class="buyrow" style="width:100%">
+          <select id="symbolChoice" aria-label="지정할 그림">
+            <option value="🍒">🍒 체리</option><option value="🍋">🍋 레몬</option>
+            <option value="🔔">🔔 종</option><option value="⭐">⭐ 별</option>
+            <option value="🍇">🍇 포도</option><option value="💎">💎 보석</option>
+          </select>
+          <button onclick="buyIntuition()">구매하고 지정하기 (50)</button>
+        </div>
+      </div>
+      <div class="buff">
+        <h3>💰 인송에게 돈빌리기 — 투자금 선택</h3>
+        <p>투자금을 먼저 지불합니다. 이번 회전의 당첨금이 투자금보다 크면 투자금의 2배를 추가로 돌려받습니다.</p>
+        <div class="buyrow">
+          <input id="investment" class="investment" type="number" min="1" step="1" value="20" aria-label="투자금">
+          <button onclick="buyInvestment()">투자하기</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel log">
+    <h2>📜 게임 기록</h2>
+    <div id="history">아직 기록이 없습니다.</div>
+  </section>
+
+  <p class="rules">
+    <b>게임 규칙</b><br>• 보유 코인이 3,000,000코인 이상이 되면 승리합니다.<br>
+    • 슬롯 회전 비용은 첫 회전 40코인부터 시작하며, 다음 회전부터 매번 20%씩 증가합니다. (소수점은 올림)<br>
+    • 당첨금은 가장 많이 나온 같은 그림의 개수로 계산합니다: 2개 = 회전 비용 × 2, 3개 = × 5, 4개 = × 12, 5개 이상 = × 25, 6개 이상 = × 40.<br>
+    • 당첨금은 가상 게임 코인입니다. 실제 돈이나 현금 가치가 없습니다.
+  </p>
+</div>
+
+<script>
+(() => {
+  const symbols = ["🍒", "🍋", "🔔", "⭐", "🍇", "💎"];
+  const GOAL = 3000000; // 최종 목표: 3,000,000코인
+  let coins = 100, spinCost = 40, turn = 0;
+  let meadow = false, fever = false, intuition = null, investment = 0;
+  let busy = false, won = false;
+
+  const $ = id => document.getElementById(id);
+  const randomSymbol = () => symbols[Math.floor(Math.random() * symbols.length)];
+
+  function update() {
+    $("coins").textContent = coins.toLocaleString("ko-KR");
+    $("cost").textContent = spinCost.toLocaleString("ko-KR");
+    $("turn").textContent = turn;
+    $("goal").textContent = GOAL.toLocaleString("ko-KR");
+    $("spinBtn").disabled = busy || won || coins < spinCost;
+    $("spinBtn").textContent = won ? "🏆 목표 달성!" : (coins < spinCost ? "코인이 부족합니다" : `🎲 슬롯 돌리기 (${spinCost}코인)`);
+    $("machineTitle").textContent = fever ? "FEVER SLOT · 10 REELS" : "SLOT MACHINE · 5 REELS";
+  }
+
+  function say(message) { $("message").textContent = message; }
+  function record(message) {
+    const history = $("history");
+    if (history.textContent === "아직 기록이 없습니다.") history.textContent = "";
+    const line = document.createElement("div");
+    line.textContent = `턴 ${turn}: ${message}`;
+    history.prepend(line);
+  }
+
+  function pay(amount, label) {
+    if (coins < amount) { say("코인이 부족합니다."); return false; }
+    coins -= amount;
+    update();
+    say(`${label} 버프를 구매했습니다.`);
+    return true;
+  }
+
+  window.buyMeadow = () => {
+    if (meadow) return say("초원의 가호가 이미 준비되어 있습니다.");
+    if (pay(100, "초원의 가호")) { meadow = true; say("초원의 가호 준비 완료! 다음 회전의 첫 세 칸이 같은 그림으로 나옵니다."); }
+  };
+  window.buyFever = () => {
+    if (fever) return say("피버빵지가 이미 준비되어 있습니다.");
+    if (pay(100, "피버빵지")) { fever = true; update(); say("피버빵지 준비 완료! 다음 회전은 10칸입니다."); }
+  };
+  window.buyIntuition = () => {
+    if (intuition) return say("미희의 직관이 이미 준비되어 있습니다.");
+    if (pay(50, "미희의 직관")) {
+      intuition = $("symbolChoice").value;
+      say(`미희의 직관 발동 준비! 다음 회전의 첫 번째 칸은 ${intuition}로 지정됩니다.`);
+    }
+  };
+  window.buyInvestment = () => {
+    if (investment > 0) return say("이미 투자금이 다음 회전에 적용될 예정입니다.");
+    const amount = Math.floor(Number($("investment").value));
+    if (!Number.isFinite(amount) || amount < 1) return say("투자금은 1코인 이상 입력해 주세요.");
+    if (!pay(amount, "인송 투자")) return;
+    investment = amount;
+    say(`${amount}코인을 투자했습니다. 다음 회전의 당첨금이 ${amount}코인보다 크면 ${amount * 2}코인을 추가로 받습니다.`);
+  };
+
+  function payoutFor(maxCount, cost) {
+    if (maxCount >= 6) return cost * 40;
+    if (maxCount >= 5) return cost * 25;
+    if (maxCount === 4) return cost * 12;
+    if (maxCount === 3) return cost * 5;
+    if (maxCount === 2) return cost * 2;
+    return 0;
+  }
+
+  const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+  function showSparkles() {
+    const layer = $("sparkleLayer");
+    layer.innerHTML = "";
+    const marks = ["✦", "✧", "✨", "★", "✦", "✧", "✨", "★", "✦", "✧", "✨", "★"];
+    marks.forEach((mark, i) => {
+      const particle = document.createElement("span");
+      particle.className = "sparkle";
+      particle.textContent = mark;
+      particle.style.left = `${8 + Math.random() * 84}%`;
+      particle.style.top = `${35 + Math.random() * 48}%`;
+      particle.style.setProperty("--dx", `${Math.round((Math.random() - .5) * 100)}px`);
+      particle.style.animationDelay = `${Math.random() * .35}s`;
+      layer.appendChild(particle);
+    });
+    setTimeout(() => { layer.innerHTML = ""; }, 1600);
+  }
+
+  window.spin = async () => {
+    if (busy || coins < spinCost) return;
+    busy = true;
+    const cost = spinCost;
+    coins -= cost;
+    const count = fever ? 10 : 5;
+    const results = Array.from({length: count}, randomSymbol);
+
+    if (meadow) {
+      const chosen = randomSymbol();
+      results[0] = chosen; results[1] = chosen; results[2] = chosen;
+    }
+    if (intuition) results[0] = intuition;
+
+    const container = $("reels");
+    container.innerHTML = "";
+    container.className = count === 10 ? "reels ten" : "reels";
+    const cells = results.map(() => {
+      const cell = document.createElement("div");
+      cell.className = "reel spinning";
+      cell.textContent = randomSymbol();
+      container.appendChild(cell);
+      return cell;
+    });
+
+    say("🎰 슬롯이 돌아가는 중입니다... 하나씩 멈춥니다!");
+    $("message").classList.remove("win-message");
+    update();
+
+    // 각 슬롯이 서로 다른 시점에 멈추도록 연출합니다.
+    await Promise.all(cells.map((cell, index) => new Promise(resolve => {
+      const interval = setInterval(() => { cell.textContent = randomSymbol(); }, 75);
+      setTimeout(() => {
+        clearInterval(interval);
+        cell.textContent = results[index];
+        cell.classList.remove("spinning");
+        cell.animate([
+          { transform: "translateY(-12px) scale(1.05)" },
+          { transform: "translateY(0) scale(1)" }
+        ], { duration: 220, easing: "cubic-bezier(.2,.8,.2,1)" });
+        resolve();
+      }, 850 + index * 230);
+    })));
+
+    const counts = {};
+    results.forEach(symbol => counts[symbol] = (counts[symbol] || 0) + 1);
+    const maxCount = Math.max(...Object.values(counts));
+    const winningSymbols = Object.keys(counts).filter(symbol => counts[symbol] === maxCount);
+    const winnings = payoutFor(maxCount, cost);
+    coins += winnings;
+
+    let message;
+    if (winnings > 0) {
+      const details = winningSymbols.map(symbol => {
+        const positions = results.map((value, index) => value === symbol ? index + 1 : null).filter(Boolean);
+        positions.forEach(position => cells[position - 1].classList.add("winner"));
+        return `${symbol} (${positions.join(", ")}번 슬롯)`;
+      });
+      message = `🎉 ${details.join(" / ")}에서 ${maxCount}개 일치! 당첨금 ${winnings}코인 획득!`;
+      showSparkles();
+      $("message").classList.add("win-message");
+    } else {
+      message = "이번 회전은 일치한 그림이 없습니다. 다음 회전을 노려보세요!";
+    }
+
+    if (investment > 0) {
+      if (winnings > investment) {
+        const bonus = investment * 2;
+        coins += bonus;
+        message += ` 인송 투자 성공! 투자금의 2배인 ${bonus}코인을 추가로 받았습니다.`;
+      } else {
+        message += ` 인송 투자 실패: 당첨금(${winnings})이 투자금(${investment})을 넘지 못했습니다.`;
+      }
+      investment = 0;
+    }
+
+    meadow = false;
+    fever = false;
+    intuition = null;
+    turn += 1;
+    spinCost = Math.ceil(spinCost * 1.2);
+
+    if (coins >= GOAL) {
+      won = true;
+      $("victoryOverlay").style.display = "flex";
+      say(`🏆 승리! ${coins.toLocaleString("ko-KR")}코인을 모아 목표 ${GOAL.toLocaleString("ko-KR")}코인을 달성했습니다!`);
+      record(`🏆 최종 목표 달성! 보유 코인 ${coins.toLocaleString("ko-KR")}코인`);
+    }
+
+    busy = false;
+    update();
+    say(message);
+    record(`${message} (회전 비용 ${cost}코인)`);
+  };
+
+  window.closeVictory = () => {
+    $("victoryOverlay").style.display = "none";
+  };
+
+  window.resetGame = () => {
+    coins = 100; spinCost = 40; turn = 0; won = false;
+    $("victoryOverlay").style.display = "none";
+    meadow = false; fever = false; intuition = null; investment = 0; busy = false;
+    $("reels").innerHTML = "";
+    $("reels").className = "reels";
+    ["🍒","🍋","🔔","⭐","🍇"].forEach(s => {
+      const cell = document.createElement("div"); cell.className = "reel"; cell.textContent = s; $("reels").appendChild(cell);
+    });
+    $("history").textContent = "아직 기록이 없습니다.";
+    $("sparkleLayer").innerHTML = "";
+    $("message").classList.remove("win-message");
+    say("게임을 초기화했습니다. 시작 코인 100개가 지급되었습니다.");
+    update();
+  };
+
+  update();
+})();
+</script>
+</body>
+</html>
